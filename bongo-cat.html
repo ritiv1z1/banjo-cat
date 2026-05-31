@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bongo Cat!</title>
+<style>
+  /* ===== RESET & BASE ===== */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg1: #FFE0EC;
+    --bg2: #FFB3CF;
+    --bg3: #FF87B8;
+    --accent1: #FF4D9E;
+    --accent2: #7C3FFF;
+    --accent3: #FFD700;
+    --cat-body: #F5C8A0;
+    --cat-dark: #E8A06A;
+    --cat-pink: #FFB3C6;
+    --cat-nose: #FF6B9D;
+    --bongo-l: #C0392B;
+    --bongo-r: #1A73C8;
+    --bongo-skin: #8B5E3C;
+    --shadow: rgba(124, 63, 255, 0.18);
+  }
+
+  body {
+    font-family: 'Comic Sans MS', 'Chalkboard SE', cursive;
+    background: var(--bg1);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+    position: relative;
+  }
+
+  /* ===== BACKGROUND PATTERN ===== */
+  .bg-pattern {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background:
+      radial-gradient(circle at 20% 20%, #ffcfe8 0%, transparent 45%),
+      radial-gradient(circle at 80% 80%, #d4c1ff 0%, transparent 45%),
+      radial-gradient(circle at 50% 50%, #fff0c8 0%, transparent 60%);
+    animation: bgPulse 4s ease-in-out infinite alternate;
+  }
+
+  @keyframes bgPulse {
+    from { opacity: 0.7; }
+    to   { opacity: 1; }
+  }
+
+  /* floating background shapes */
+  .bg-shapes {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+  }
+
+  .bg-dot {
+    position: absolute;
+    border-radius: 50%;
+    opacity: 0.25;
+    animation: floatDot linear infinite;
+  }
+
+  @keyframes floatDot {
+    0%   { transform: translateY(0)   rotate(0deg); opacity: 0.25; }
+    50%  { opacity: 0.4; }
+    100% { transform: translateY(-110vh) rotate(360deg); opacity: 0; }
+  }
+
+  /* ===== SCORE DISPLAY ===== */
+  .score-area {
+    position: relative;
+    z-index: 10;
+    text-align: center;
+    margin-bottom: 12px;
+    pointer-events: none;
+  }
+
+  .score-label {
+    font-size: clamp(13px, 2.5vw, 16px);
+    color: var(--accent2);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.85;
+  }
+
+  .score-number {
+    font-size: clamp(42px, 10vw, 80px);
+    font-weight: 900;
+    color: var(--accent1);
+    line-height: 1;
+    text-shadow: 3px 3px 0 rgba(124,63,255,0.2), 6px 6px 0 rgba(255,77,158,0.12);
+    transition: transform 0.08s cubic-bezier(.36,.07,.19,.97);
+  }
+
+  .score-number.pop {
+    animation: scorePop 0.22s cubic-bezier(.36,.07,.19,.97);
+  }
+
+  @keyframes scorePop {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.25) rotate(-3deg); }
+    70%  { transform: scale(0.95) rotate(1deg); }
+    100% { transform: scale(1) rotate(0); }
+  }
+
+  .highscore-label {
+    font-size: clamp(11px, 2vw, 13px);
+    color: var(--accent2);
+    opacity: 0.6;
+    margin-top: 2px;
+  }
+
+  /* ===== STAGE (cat + bongos) ===== */
+  .stage {
+    position: relative;
+    z-index: 5;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    width: min(420px, 95vw);
+    height: min(360px, 75vw);
+    filter: drop-shadow(0 18px 40px var(--shadow));
+  }
+
+  /* ===== CAT SVG ===== */
+  #cat-svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    transform-origin: 50% 85%;
+    transition: transform 0.05s;
+    will-change: transform;
+  }
+
+  /* paw groups */
+  #paw-left  { transform-origin: 155px 285px; transition: transform 0.08s cubic-bezier(.36,.07,.19,.97); }
+  #paw-right { transform-origin: 265px 285px; transition: transform 0.08s cubic-bezier(.36,.07,.19,.97); }
+
+  #paw-left.hit  { animation: pawHitL 0.22s cubic-bezier(.36,.07,.19,.97); }
+  #paw-right.hit { animation: pawHitR 0.22s cubic-bezier(.36,.07,.19,.97); }
+
+  @keyframes pawHitL {
+    0%   { transform: rotate(0)    translateY(0); }
+    30%  { transform: rotate(-18deg) translateY(14px) scaleY(0.88); }
+    60%  { transform: rotate(5deg)  translateY(-4px); }
+    100% { transform: rotate(0)    translateY(0); }
+  }
+
+  @keyframes pawHitR {
+    0%   { transform: rotate(0)    translateY(0); }
+    30%  { transform: rotate(18deg)  translateY(14px) scaleY(0.88); }
+    60%  { transform: rotate(-5deg) translateY(-4px); }
+    100% { transform: rotate(0)    translateY(0); }
+  }
+
+  /* squash-stretch on body */
+  #cat-body-group {
+    transform-origin: 210px 230px;
+  }
+  #cat-body-group.squash {
+    animation: squashStretch 0.28s cubic-bezier(.36,.07,.19,.97);
+  }
+
+  @keyframes squashStretch {
+    0%   { transform: scaleX(1)    scaleY(1); }
+    20%  { transform: scaleX(1.07) scaleY(0.94); }
+    50%  { transform: scaleX(0.95) scaleY(1.06); }
+    80%  { transform: scaleX(1.02) scaleY(0.99); }
+    100% { transform: scaleX(1)    scaleY(1); }
+  }
+
+  /* blink */
+  #eye-left-lid, #eye-right-lid {
+    transform-origin: center;
+    transform: scaleY(0);
+    transition: transform 0.07s;
+  }
+  .blinking #eye-left-lid,
+  .blinking #eye-right-lid {
+    animation: blink 0.2s ease-in-out;
+  }
+  @keyframes blink {
+    0%,100% { transform: scaleY(0); }
+    40%,60% { transform: scaleY(1); }
+  }
+
+  /* happy expression */
+  #mouth-happy { opacity: 0; transition: opacity 0.15s; }
+  #mouth-normal { opacity: 1; transition: opacity 0.15s; }
+  .cat-happy #mouth-happy  { opacity: 1; }
+  .cat-happy #mouth-normal { opacity: 0; }
+
+  /* ===== HINT TEXT ===== */
+  .hint {
+    position: relative;
+    z-index: 10;
+    margin-top: 14px;
+    font-size: clamp(13px, 2.8vw, 17px);
+    color: var(--accent2);
+    opacity: 0.7;
+    letter-spacing: 0.04em;
+    pointer-events: none;
+    animation: hintBob 2.2s ease-in-out infinite;
+  }
+
+  @keyframes hintBob {
+    0%,100% { transform: translateY(0); }
+    50%     { transform: translateY(-5px); }
+  }
+
+  /* ===== PARTICLE CANVAS ===== */
+  #particles {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 20;
+  }
+
+  /* ===== SCREEN SHAKE ===== */
+  .shake {
+    animation: screenShake 0.22s cubic-bezier(.36,.07,.19,.97);
+  }
+
+  @keyframes screenShake {
+    0%,100% { transform: translate(0, 0); }
+    20%     { transform: translate(-3px, 2px); }
+    40%     { transform: translate(3px, -2px); }
+    60%     { transform: translate(-2px, 3px); }
+    80%     { transform: translate(2px, -1px); }
+  }
+
+  /* ===== RESPONSIVE ===== */
+  @media (max-width: 480px) {
+    .stage { height: min(300px, 78vw); }
+  }
+  @media (max-height: 600px) {
+    .score-number { font-size: 38px; }
+    .stage { height: min(260px, 60vh); }
+    .hint  { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Colorful background -->
+<div class="bg-pattern"></div>
+<div class="bg-shapes" id="bgShapes"></div>
+
+<!-- Particle canvas -->
+<canvas id="particles"></canvas>
+
+<!-- Score -->
+<div class="score-area">
+  <div class="score-label">🥁 bongo hits</div>
+  <div class="score-number" id="scoreDisplay">0</div>
+  <div class="highscore-label" id="highscoreDisplay">best: 0</div>
+</div>
+
+<!-- Cat stage -->
+<div class="stage" id="stage">
+  <svg id="cat-svg" viewBox="0 0 420 360" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <!-- cat fur gradient -->
+      <radialGradient id="bodyGrad" cx="50%" cy="40%" r="55%">
+        <stop offset="0%"   stop-color="#FCDBA8"/>
+        <stop offset="100%" stop-color="#E89A5A"/>
+      </radialGradient>
+      <!-- bongo left gradient -->
+      <radialGradient id="bongoLGrad" cx="40%" cy="35%" r="60%">
+        <stop offset="0%"   stop-color="#E74C3C"/>
+        <stop offset="100%" stop-color="#7B241C"/>
+      </radialGradient>
+      <!-- bongo right gradient -->
+      <radialGradient id="bongoRGrad" cx="40%" cy="35%" r="60%">
+        <stop offset="0%"   stop-color="#3498DB"/>
+        <stop offset="100%" stop-color="#1A5276"/>
+      </radialGradient>
+      <!-- bongo top skin -->
+      <radialGradient id="bongoTopGrad" cx="40%" cy="35%" r="65%">
+        <stop offset="0%"   stop-color="#D4A570"/>
+        <stop offset="100%" stop-color="#8B5E3C"/>
+      </radialGradient>
+      <!-- shadow under cat -->
+      <radialGradient id="shadowGrad" cx="50%" cy="50%" r="50%">
+        <stop offset="0%"   stop-color="rgba(124,63,255,0.25)"/>
+        <stop offset="100%" stop-color="rgba(124,63,255,0)"/>
+      </radialGradient>
+      <!-- inner ear -->
+      <radialGradient id="earInnerGrad" cx="50%" cy="60%" r="55%">
+        <stop offset="0%"   stop-color="#FFB3C6"/>
+        <stop offset="100%" stop-color="#FF87B2"/>
+      </radialGradient>
+    </defs>
+
+    <!-- Shadow -->
+    <ellipse cx="210" cy="348" rx="120" ry="16" fill="url(#shadowGrad)"/>
+
+    <!-- ======== BONGOS (behind paws) ======== -->
+    <!-- Left bongo (red) -->
+    <g id="bongo-left">
+      <!-- drum body -->
+      <ellipse cx="118" cy="310" rx="52" ry="38" fill="url(#bongoLGrad)"/>
+      <!-- highlights -->
+      <ellipse cx="108" cy="298" rx="14" ry="8" fill="rgba(255,255,255,0.15)"/>
+      <!-- drum rim -->
+      <ellipse cx="118" cy="297" rx="52" ry="16" fill="#8B2020"/>
+      <ellipse cx="118" cy="294" rx="52" ry="16" fill="#B03030"/>
+      <!-- drum top (skin) -->
+      <ellipse cx="118" cy="291" rx="50" ry="14" fill="url(#bongoTopGrad)"/>
+      <ellipse cx="118" cy="291" rx="50" ry="14" fill="none" stroke="#7A5030" stroke-width="2"/>
+      <!-- rope detail -->
+      <path d="M72,305 Q65,320 70,335" stroke="#5A3010" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      <path d="M164,305 Q171,320 166,335" stroke="#5A3010" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    </g>
+
+    <!-- Right bongo (blue) -->
+    <g id="bongo-right">
+      <ellipse cx="302" cy="310" rx="52" ry="38" fill="url(#bongoRGrad)"/>
+      <ellipse cx="292" cy="298" rx="14" ry="8" fill="rgba(255,255,255,0.15)"/>
+      <ellipse cx="302" cy="297" rx="52" ry="16" fill="#1A4F80"/>
+      <ellipse cx="302" cy="294" rx="52" ry="16" fill="#2060A0"/>
+      <ellipse cx="302" cy="291" rx="50" ry="14" fill="url(#bongoTopGrad)"/>
+      <ellipse cx="302" cy="291" rx="50" ry="14" fill="none" stroke="#7A5030" stroke-width="2"/>
+      <path d="M256,305 Q249,320 254,335" stroke="#1A3560" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      <path d="M348,305 Q355,320 350,335" stroke="#1A3560" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    </g>
+
+    <!-- ======== CAT BODY GROUP (squash/stretch) ======== -->
+    <g id="cat-body-group">
+
+      <!-- Tail -->
+      <path d="M280,295 Q340,260 355,210 Q365,175 340,160" stroke="#E89A5A" stroke-width="20" stroke-linecap="round" fill="none"/>
+      <path d="M280,295 Q340,260 355,210 Q365,175 340,160" stroke="#FCDBA8" stroke-width="14" stroke-linecap="round" fill="none"/>
+      <!-- tail tip -->
+      <ellipse cx="338" cy="157" rx="14" ry="14" fill="#FCDBA8"/>
+      <ellipse cx="338" cy="157" rx="9" ry="9" fill="#FF87B2"/>
+
+      <!-- Body -->
+      <ellipse cx="210" cy="270" rx="90" ry="75" fill="url(#bodyGrad)"/>
+      <!-- belly -->
+      <ellipse cx="210" cy="280" rx="52" ry="44" fill="#FCEBD2"/>
+
+      <!-- Ears (behind head) -->
+      <g id="ear-left">
+        <polygon points="138,118 118,60 168,90" fill="#E89A5A"/>
+        <polygon points="140,112 126,76 160,95" fill="url(#earInnerGrad)"/>
+      </g>
+      <g id="ear-right">
+        <polygon points="282,118 302,60 252,90" fill="#E89A5A"/>
+        <polygon points="280,112 294,76 260,95" fill="url(#earInnerGrad)"/>
+      </g>
+
+      <!-- Head -->
+      <ellipse cx="210" cy="160" rx="82" ry="75" fill="url(#bodyGrad)"/>
+      <!-- head highlight -->
+      <ellipse cx="192" cy="132" rx="30" ry="22" fill="rgba(255,255,255,0.18)" transform="rotate(-15,192,132)"/>
+
+      <!-- Cheek puffs -->
+      <ellipse cx="148" cy="183" rx="26" ry="18" fill="#FFD0DC" opacity="0.7"/>
+      <ellipse cx="272" cy="183" rx="26" ry="18" fill="#FFD0DC" opacity="0.7"/>
+
+      <!-- ---- FACE ---- -->
+      <!-- Eyes (normal - open) -->
+      <g id="eyes-open">
+        <!-- left eye -->
+        <ellipse cx="182" cy="158" rx="16" ry="17" fill="white"/>
+        <ellipse cx="184" cy="160" rx="10" ry="11" fill="#3A2010"/>
+        <ellipse cx="186" cy="156" rx="4"  ry="4"  fill="#1A0808"/>
+        <ellipse cx="190" cy="155" rx="2.5" ry="2.5" fill="white"/>
+        <!-- right eye -->
+        <ellipse cx="238" cy="158" rx="16" ry="17" fill="white"/>
+        <ellipse cx="236" cy="160" rx="10" ry="11" fill="#3A2010"/>
+        <ellipse cx="238" cy="156" rx="4"  ry="4"  fill="#1A0808"/>
+        <ellipse cx="242" cy="155" rx="2.5" ry="2.5" fill="white"/>
+      </g>
+
+      <!-- Blink lids (overlaid) -->
+      <rect id="eye-left-lid"  x="166" y="143" width="32" height="34" rx="16" fill="#FCDBA8"/>
+      <rect id="eye-right-lid" x="222" y="143" width="32" height="34" rx="16" fill="#FCDBA8"/>
+
+      <!-- Happy eyes (^_^ style, hidden by default) -->
+      <g id="eyes-happy" opacity="0">
+        <path d="M166,158 Q182,140 198,158" stroke="#3A2010" stroke-width="4" fill="none" stroke-linecap="round"/>
+        <path d="M222,158 Q238,140 254,158" stroke="#3A2010" stroke-width="4" fill="none" stroke-linecap="round"/>
+      </g>
+
+      <!-- Nose -->
+      <ellipse cx="210" cy="182" rx="8" ry="5.5" fill="#FF6B9D"/>
+      <!-- nose highlight -->
+      <ellipse cx="208" cy="180" rx="3" ry="2" fill="rgba(255,255,255,0.45)"/>
+
+      <!-- Mouth normal -->
+      <g id="mouth-normal">
+        <path d="M202,190 Q210,198 218,190" stroke="#C05080" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      </g>
+      <!-- Mouth happy (big smile) -->
+      <g id="mouth-happy">
+        <path d="M196,190 Q210,206 224,190" stroke="#C05080" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <!-- tongue -->
+        <ellipse cx="210" cy="200" rx="8" ry="6" fill="#FF87B2"/>
+      </g>
+
+      <!-- Whiskers left -->
+      <g stroke="#8B6040" stroke-width="1.5" stroke-linecap="round" opacity="0.75">
+        <line x1="120" y1="178" x2="172" y2="182"/>
+        <line x1="116" y1="186" x2="170" y2="187"/>
+        <line x1="120" y1="194" x2="172" y2="192"/>
+      </g>
+      <!-- Whiskers right -->
+      <g stroke="#8B6040" stroke-width="1.5" stroke-linecap="round" opacity="0.75">
+        <line x1="300" y1="178" x2="248" y2="182"/>
+        <line x1="304" y1="186" x2="250" y2="187"/>
+        <line x1="300" y1="194" x2="248" y2="192"/>
+      </g>
+
+      <!-- Stripes on head -->
+      <g stroke="#D4884A" stroke-width="3" stroke-linecap="round" opacity="0.5">
+        <path d="M198,100 Q202,88 200,76"/>
+        <path d="M210,97 Q210,84 210,72"/>
+        <path d="M222,100 Q218,88 220,76"/>
+      </g>
+
+    </g><!-- end cat-body-group -->
+
+    <!-- ======== PAWS (in front of everything) ======== -->
+    <!-- Left paw -->
+    <g id="paw-left">
+      <!-- arm -->
+      <path d="M148,260 Q138,278 140,295" stroke="#E89A5A" stroke-width="28" stroke-linecap="round" fill="none"/>
+      <path d="M148,260 Q138,278 140,295" stroke="#FCDBA8" stroke-width="20" stroke-linecap="round" fill="none"/>
+      <!-- paw pad -->
+      <ellipse cx="140" cy="298" rx="24" ry="16" fill="#FCDBA8"/>
+      <ellipse cx="140" cy="298" rx="24" ry="16" fill="none" stroke="#E89A5A" stroke-width="2"/>
+      <!-- toe beans -->
+      <ellipse cx="125" cy="291" rx="7" ry="5.5" fill="#FFB3C6"/>
+      <ellipse cx="140" cy="287" rx="7" ry="5.5" fill="#FFB3C6"/>
+      <ellipse cx="155" cy="291" rx="7" ry="5.5" fill="#FFB3C6"/>
+      <!-- palm bean -->
+      <ellipse cx="140" cy="302" rx="9"  ry="7"   fill="#FFB3C6"/>
+    </g>
+
+    <!-- Right paw -->
+    <g id="paw-right">
+      <path d="M272,260 Q282,278 280,295" stroke="#E89A5A" stroke-width="28" stroke-linecap="round" fill="none"/>
+      <path d="M272,260 Q282,278 280,295" stroke="#FCDBA8" stroke-width="20" stroke-linecap="round" fill="none"/>
+      <ellipse cx="280" cy="298" rx="24" ry="16" fill="#FCDBA8"/>
+      <ellipse cx="280" cy="298" rx="24" ry="16" fill="none" stroke="#E89A5A" stroke-width="2"/>
+      <ellipse cx="265" cy="291" rx="7" ry="5.5" fill="#FFB3C6"/>
+      <ellipse cx="280" cy="287" rx="7" ry="5.5" fill="#FFB3C6"/>
+      <ellipse cx="295" cy="291" rx="7" ry="5.5" fill="#FFB3C6"/>
+      <ellipse cx="280" cy="302" rx="9"  ry="7"   fill="#FFB3C6"/>
+    </g>
+
+  </svg><!-- end cat-svg -->
+</div>
+
+<!-- Tap hint -->
+<p class="hint" id="hint">tap anywhere to bongo! 🥁</p>
+
+<script>
+/* ============================================================
+   BONGO CAT — Main Script
+   ============================================================ */
+
+// ---- State ----
+let score     = 0;
+let highScore = parseInt(localStorage.getItem('bongoCatHigh') || '0', 10);
+let nextPaw   = 'left';   // alternates each hit
+let happyTimer = null;
+let blinkTimer = null;
+let isHappy    = false;
+
+// DOM refs
+const scoreEl    = document.getElementById('scoreDisplay');
+const highEl     = document.getElementById('highscoreDisplay');
+const catSvg     = document.getElementById('cat-svg');
+const bodyGroup  = document.getElementById('cat-body-group');
+const pawLeft    = document.getElementById('paw-left');
+const pawRight   = document.getElementById('paw-right');
+const eyesHappy  = document.getElementById('eyes-happy');
+const eyesOpen   = document.getElementById('eyes-open');
+const eyeLLid    = document.getElementById('eye-left-lid');
+const eyeRLid    = document.getElementById('eye-right-lid');
+const hintEl     = document.getElementById('hint');
+const stage      = document.getElementById('stage');
+const canvas     = document.getElementById('particles');
+const ctx        = canvas.getContext('2d');
+
+// Update high score display
+highEl.textContent = `best: ${highScore}`;
+
+// ---- Resize canvas ----
+function resizeCanvas() {
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// ============================================================
+// WEB AUDIO — synthesized bongo sounds
+// ============================================================
+let audioCtx = null;
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playBongo(isLeft) {
+  try {
+    const ac   = getAudioCtx();
+    const now  = ac.currentTime;
+
+    // Pitch differs: left = lower, right = higher
+    const freqStart = isLeft ? 320 : 480;
+    const freqEnd   = isLeft ?  60 :  90;
+    const gainPeak  = isLeft ? 0.7 : 0.65;
+
+    // Oscillator (tone body)
+    const osc  = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.connect(gain);
+    gain.connect(ac.destination);
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freqStart, now);
+    osc.frequency.exponentialRampToValueAtTime(freqEnd, now + 0.18);
+
+    gain.gain.setValueAtTime(gainPeak, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+
+    osc.start(now);
+    osc.stop(now + 0.3);
+
+    // Add a noise "slap" transient
+    const bufLen  = ac.sampleRate * 0.06;
+    const buffer  = ac.createBuffer(1, bufLen, ac.sampleRate);
+    const data    = buffer.getChannelData(0);
+    for (let i = 0; i < bufLen; i++) data[i] = (Math.random() * 2 - 1);
+
+    const noise     = ac.createBufferSource();
+    const noiseGain = ac.createGain();
+    const filter    = ac.createBiquadFilter();
+    filter.type            = 'bandpass';
+    filter.frequency.value = isLeft ? 400 : 600;
+    filter.Q.value         = 0.8;
+
+    noise.buffer = buffer;
+    noise.connect(filter);
+    filter.connect(noiseGain);
+    noiseGain.connect(ac.destination);
+
+    noiseGain.gain.setValueAtTime(isLeft ? 0.55 : 0.5, now);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+    noise.start(now);
+    noise.stop(now + 0.07);
+  } catch(e) {
+    // Audio not supported — fail silently
+  }
+}
+
+// ============================================================
+// PARTICLES
+// ============================================================
+const NOTES  = ['♩','♪','♫','♬','✦','★','✿','❋'];
+const COLORS = ['#FF4D9E','#7C3FFF','#FFD700','#FF87B8','#00E5FF','#FF6B35','#A8FF3E'];
+
+class Particle {
+  constructor(x, y) {
+    this.x    = x;
+    this.y    = y;
+    this.char = NOTES[Math.floor(Math.random() * NOTES.length)];
+    this.col  = COLORS[Math.floor(Math.random() * COLORS.length)];
+    this.vx   = (Math.random() - 0.5) * 5;
+    this.vy   = -(Math.random() * 4 + 2);
+    this.size = Math.random() * 14 + 12;
+    this.life = 1;
+    this.decay = Math.random() * 0.025 + 0.02;
+    this.rot  = (Math.random() - 0.5) * 0.2;
+    this.angle = 0;
+  }
+  update() {
+    this.x    += this.vx;
+    this.y    += this.vy;
+    this.vy   += 0.08;      // gravity
+    this.life -= this.decay;
+    this.angle += this.rot;
+  }
+  draw(ctx) {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, this.life);
+    ctx.font = `bold ${this.size}px 'Comic Sans MS', cursive`;
+    ctx.fillStyle = this.col;
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.angle);
+    ctx.fillText(this.char, 0, 0);
+    ctx.restore();
+  }
+}
+
+const particles = [];
+
+function spawnParticles(x, y) {
+  const count = Math.floor(Math.random() * 5) + 5;
+  for (let i = 0; i < count; i++) {
+    particles.push(new Particle(x, y));
+  }
+}
+
+// ---- Particle loop ----
+function particleLoop() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (let i = particles.length - 1; i >= 0; i--) {
+    particles[i].update();
+    particles[i].draw(ctx);
+    if (particles[i].life <= 0) particles.splice(i, 1);
+  }
+  requestAnimationFrame(particleLoop);
+}
+particleLoop();
+
+// ============================================================
+// BACKGROUND FLOATING DOTS
+// ============================================================
+const DOT_COLORS = ['#FFB3CF','#D4C1FF','#FFE08A','#A8F0D8','#FFB3B3'];
+const bgShapes   = document.getElementById('bgShapes');
+
+for (let i = 0; i < 22; i++) {
+  const dot = document.createElement('div');
+  dot.className = 'bg-dot';
+  const size  = Math.random() * 40 + 12;
+  const left  = Math.random() * 100;
+  const delay = Math.random() * 12;
+  const dur   = Math.random() * 14 + 10;
+  const col   = DOT_COLORS[Math.floor(Math.random() * DOT_COLORS.length)];
+  dot.style.cssText = `
+    width:${size}px; height:${size}px;
+    left:${left}%; top:${Math.random()*100+100}%;
+    background:${col};
+    animation-duration:${dur}s;
+    animation-delay:-${delay}s;
+  `;
+  bgShapes.appendChild(dot);
+}
+
+// ============================================================
+// ANIMATION HELPERS
+// ============================================================
+function addClass(el, cls, removeCb) {
+  el.classList.remove(cls);
+  void el.offsetWidth; // reflow to restart animation
+  el.classList.add(cls);
+  if (removeCb) {
+    el.addEventListener('animationend', function h() {
+      el.classList.remove(cls);
+      el.removeEventListener('animationend', h);
+      if (removeCb) removeCb();
+    });
+  }
+}
+
+// Blink scheduling
+function scheduleBlink() {
+  const delay = Math.random() * 4000 + 1500;
+  blinkTimer = setTimeout(() => {
+    // Don't blink when already happy-eye
+    if (!isHappy) {
+      eyeLLid.style.animation = 'none';
+      eyeRLid.style.animation = 'none';
+      void eyeLLid.offsetWidth;
+      eyeLLid.style.animation = '';
+      eyeRLid.style.animation = '';
+      catSvg.classList.add('blinking');
+      setTimeout(() => catSvg.classList.remove('blinking'), 250);
+    }
+    scheduleBlink();
+  }, delay);
+}
+scheduleBlink();
+
+// Happy face for 600ms after a hit
+function triggerHappy() {
+  isHappy = true;
+  eyesOpen.setAttribute('opacity', '0');
+  eyesHappy.setAttribute('opacity', '1');
+  catSvg.classList.add('cat-happy');
+  clearTimeout(happyTimer);
+  happyTimer = setTimeout(() => {
+    isHappy = false;
+    eyesOpen.setAttribute('opacity', '1');
+    eyesHappy.setAttribute('opacity', '0');
+    catSvg.classList.remove('cat-happy');
+  }, 600);
+}
+
+// Screen shake
+function shakeScreen() {
+  document.body.classList.remove('shake');
+  void document.body.offsetWidth;
+  document.body.classList.add('shake');
+  document.body.addEventListener('animationend', () => {
+    document.body.classList.remove('shake');
+  }, { once: true });
+}
+
+// ============================================================
+// MAIN BONGO HIT
+// ============================================================
+function bongo(clientX, clientY) {
+  // Hide hint after first hit
+  if (hintEl.style.opacity !== '0') {
+    hintEl.style.transition = 'opacity 0.4s';
+    hintEl.style.opacity = '0';
+  }
+
+  // Which paw?
+  const isLeft = nextPaw === 'left';
+  nextPaw = isLeft ? 'right' : 'left';
+
+  // Animate paw
+  addClass(isLeft ? pawLeft : pawRight, 'hit');
+
+  // Squash body
+  addClass(bodyGroup, 'squash');
+
+  // Happy face
+  triggerHappy();
+
+  // Sound
+  playBongo(isLeft);
+
+  // Particles — spawn near the hit bongo
+  const rect    = stage.getBoundingClientRect();
+  const bongoX  = isLeft
+    ? rect.left + rect.width  * 0.28
+    : rect.left + rect.width  * 0.72;
+  const bongoY  = rect.top  + rect.height * 0.82;
+  spawnParticles(bongoX, bongoY);
+
+  // Screen shake
+  shakeScreen();
+
+  // Score
+  score++;
+  scoreEl.textContent = score;
+  addClass(scoreEl, 'pop');
+
+  // High score
+  if (score > highScore) {
+    highScore = score;
+    localStorage.setItem('bongoCatHigh', highScore);
+    highEl.textContent = `best: ${highScore} 🎉`;
+  }
+}
+
+// ============================================================
+// EVENT LISTENERS — click, touch, keyboard
+// ============================================================
+// Prevent double-fire on mobile (touch + click)
+let lastTouch = 0;
+
+document.addEventListener('click', (e) => {
+  if (Date.now() - lastTouch < 400) return;
+  bongo(e.clientX, e.clientY);
+});
+
+document.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  lastTouch = Date.now();
+  const t = e.touches[0];
+  bongo(t.clientX, t.clientY);
+}, { passive: false });
+
+// Keyboard support (spacebar / enter)
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' || e.code === 'Enter') {
+    e.preventDefault();
+    bongo(window.innerWidth / 2, window.innerHeight / 2);
+  }
+});
+</script>
+</body>
+</html>
